@@ -75,7 +75,7 @@ A mission consists of the following main components:
 
 ## Map Extension Workflow
 
-![Map Extension Workflow](document/map extension.png)
+![Map Extension Workflow](document/map_extension.png)
 
 This diagram illustrates how map extension is performed during robot navigation.
 
