@@ -102,6 +102,7 @@ This process enables seamless navigation across extended or segmented maps while
 
 本文件詳細說明如何透過 FMS Restful API 設定 AMR 的目標點，並透過 Modbus 與 I/O 指令完成自動化物料搬運任務。
 
+
 ---
 
 ## 1. 導航與目標點設定
@@ -111,8 +112,27 @@ This process enables seamless navigation across extended or segmented maps while
 * **搬運終點 (End Station)**：目標點名稱設定為 `end`。
 
 ---
+### 任務範例：前往 A 站點 (起點)   
+
+'''  
+Mission_2A_station=[                           
+    ["MoveTo_TrafficNetwork",["start","map_name"], "Rail"], // 透過軌道 PP   
+    ["DockTo",["start-dock","map_name"]]                    // AMR 停靠 A-station   
+]  
+'''  
+
+### 任務範例：前往 B 站點 (終點)  
+
+'''  
+Mission_2B_station=[                           
+    ["MoveTo_TrafficNetwork",["end","map_name"], "Rail"],   // 透過軌道 PP   
+    ["DockTo",["end-dock","map_name"]]                     // AMR 停靠 B-station   
+]  
+'''  
+
 
 ## 2. 任務範例與交涉邏輯
+
 
 ### AMR 接收物品 (上貨流程)
 當 AMR 到達 A 站點後，執行以下程序以接收貨物：
@@ -121,6 +141,22 @@ This process enables seamless navigation across extended or segmented maps while
 3.  **確認上貨**：透過 `ExtInputWaitMuti` 等待訊號，確認物料已進入 AMR (Magazine 上貨完成)。
 4.  **停止收貨**：關閉輸出以停止滾輪，並對 `#40002` 寫入值 `2` 表示接收完成。
 5.  **狀態歸零**：延遲 1 秒後將 `#40002` 狀態歸 `0`。
+  
+'''  
+Mission_A_station_Ship=[  
+    ["SetModbusDoubleCheck",["modbus_a_server",502],[1,"HOLD_REG"],[1,1,1],-1.0],   // 1: AMR到位 (#40002:1)   
+    ["ExtOutputSetMuti", [0,1,2,3], [1,1,0,0] ],                                    // 滾輪開始收貨   
+    ["ExtInputWaitMuti", [0,1], [0,1] , -1.0],                                      // 確認上貨完成 [0,1] bit0:0 bit1:1
+    ["ExtOutputSetMuti", [0,1,2,3], [0,0,0,0] ],                                    // 停止滾輪   
+    ["SetModbusDoubleCheck",["modbus_a_server",502],[1,"HOLD_REG"],[1,1,2],-1.0],   // 2: AMR接收完成 (#40002:2)   
+    ["TimeWait", 1.0 ],                                               
+    ["SetModbusDoubleCheck",["modbus_a_server",502],[1,"HOLD_REG"],[1,1,0],-1.0],   // 0: 狀態歸零 (#40002:0)
+    ["ExtInputWaitMuti", [0,1], [0,1] , -1.0]                                       // 確認入口感應器狀態   
+]  
+'''  
+
+
+
 
 ### AMR 推送物品 (下貨流程)
 當 AMR 到達 B 站點後，執行以下程序將貨物卸載：
@@ -129,6 +165,20 @@ This process enables seamless navigation across extended or segmented maps while
 3.  **確認入籃許可**：等待站點將 `#40004` 變更為 `1` (代表站點允許入籃)。
 4.  **執行下貨**：對 `#40003` 寫入值 `2` 並啟動滾輪。
 5.  **確認完成**：等待貨物離開感應器，停止滾輪並將 `#40003` 狀態歸 `0`。
+  
+'''  
+Mission_B_station_Restock=[  
+    ["WaitModbusSingleEqual",["modbus_b_server",502],[1,"HOLD_REG"],[3,0], -1.0],   // 等待站點就緒 (#40004:0)   
+    ["SetModbusDoubleCheck",["modbus_b_server",502],[1,"HOLD_REG"],[2,1,1],-1.0],   // 1: AMR到位 (#40003:1)   
+    ["WaitModbusSingleEqual",["modbus_b_server",502],[1,"HOLD_REG"],[3,1], -1.0],   // 等待站點允許入籃 (#40004:1)   
+    ["SetModbusDoubleCheck",["modbus_b_server",502],[1,"HOLD_REG"],[2,1,2],-1.0],   // 2: AMR出籃中 (#40003:2)   
+    ["ExtOutputSetMuti", [0,1,2,3], [1,0,0,0] ],                                    // 滾輪開始下貨
+    ["ExtInputWaitMuti", [0,1], [0,0] , -1.0],                                      // 等待下貨完成   
+    ["TimeWait", 3.0 ],
+    ["ExtOutputSetMuti", [0,1,2,3], [0,0,0,0] ],                 
+    ["SetModbusDoubleCheck",["modbus_b_server",502],[1,"HOLD_REG"],[2,1,0],-1.0]    // 0: 狀態歸零 (#40003:0) 
+]   
+'''  
 
 ---
 
