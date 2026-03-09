@@ -101,6 +101,9 @@ This process enables seamless navigation across extended or segmented maps while
 # MCS (Material Control System) 說明文件 (AMR配合 roller 以及 modbus 通訊的範例)
 
 本文件詳細說明如何透過 FMS Restful API 設定 AMR 的目標點，並透過 Modbus 與 I/O 指令完成自動化物料搬運任務。
+![AMR 設備端通訊方法](document/投影片4.PNG)
+![AMR 與 roller 之間的 IO控制接圖](document/投影片7.PNG)
+
 
 
 ---
