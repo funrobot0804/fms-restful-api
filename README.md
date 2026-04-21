@@ -202,6 +202,122 @@ Mission_B_station_Restock=[
 
 ---
 
-## 4. 相關連結
+## 4. HTTP Restful API 新增
+
+### check_on_point (檢查AMR是否在指定點位上)
+```
+url = "http://127.0.0.1:6600" + "/check_on_point"
+payload = {
+            "robot_name": "msi_default",   # AMR 名稱
+
+            "name": "dock_0",              # 點位名稱（Target 或 Dock 的名稱）
+
+            "type": "dock",                # "target" - 目標點位
+                                           # "dock"   - 充電站
+
+            "range": 0.2,                  # 判斷距離閾值，單位：公尺(m)
+                                           # 參考點與點位的直線距離 <= range 時回傳 True
+
+            "offset": -0.4                 # 可選，預設 0.0
+                                           # 將計算用的參考點沿 AMR 的正面方向（X 軸）偏移
+                                           # 單位：公尺(m)
+                                           # 正值 → 往 AMR 前方移動
+                                           # 負值 → 往 AMR 後方移動
+                                           # 範例：offset = status.center2front
+                                           #        → 參考點移至 AMR 前端中心
+            }
+
+r = requests.post(url, data=json.dumps(payload))
+```
+
+### set_mission 新增 group 參數 
+當所有指定group的任務做完後才會觸發自動回充電站
+
+```
+url = "http://127.0.0.1:6600"+"/set_mission"
+payload = { "start_time":float( time.time() ),    # 格式為float，西元1970年後所經過的浮點秒數(UTC)
+            "using_time":float(300),              # 格式為float，任務欲使用的浮點秒數
+            "userid":int(15938),                  # 格式為int，下命令者的userid
+            "robot_type":int(0),                  # 格式為int，欲使用的robot type (垃圾車、送餐車、送衣服車...)
+            "robot_mode":[0,0,0],                 # 格式為list，0 => off
+                                                  #             1 => on
+                                                  # [上UV燈、下UV燈、吸塵器]
+
+            "robot_name": "msi_default",            # 格式為str，指定機器的名字，如果有指定就只會挑選特定名稱的機器
+
+            "group": int(2),                      # 格式為int，任務所屬的群組編號
+                                                  # -1  => 不屬於任何群組 (預設值，行為與舊版相同)
+                                                  # 0,1,2,3... => 群組編號
+                                                  #
+                                                  # 用途：當AGV電量不足時，若當前任務屬於某個群組(group != -1)，
+                                                  #       console會等到該群組內所有任務都完成後，才讓AGV去充電，
+                                                  #       避免中途打斷同批次的任務。
+                                                  #       若group為-1，則電量不足時立刻中斷任務去充電(舊行為)。
+
+            # MoveTo指令格式
+            #
+            # 指定前往目的地，可使用'座標點'或是'目的地名稱'
+            #
+            #["MoveTo",[x(float,單位:m), y(float,單位:m), a(float,單位:rad), floor(字串)]]
+            #["MoveTo",[target name(字串), floor(字串)]]
+            "task_arr":[ ["MoveTo_TrafficNetwork", ["chamber_A", "saa_0320@1F"], "Rail"],
+                         ["MoveTo_TrafficNetwork", ["chamber_B", "saa_0320@1F"], "Rail"]
+                       ]
+
+            }
+r = requests.post(url, data=json.dumps(payload))
+```
+### get_mission 新增 group 參數
+如果使用此API的時候有使用 **負數** index，請注意讀取順序
+
+```
+    回傳資料格式
+    {
+        'result':'success',          # 會有'success'和'fail'兩字串，'success'代表console端沒錯誤，'fail'代表console端可能有錯誤
+        
+        'value':{'unfinish':         # 有'unfinish'和'finish'兩種字串，端看當時POST的'category' 
+                 [
+                    ['3',  '2/2', 'Simulator_104', '1592209639', '60 sec', '[15938,1592209639]', '[-1,-1.0]', '0', '[0 0 0]', "[[-19.1, 28.48, -3.14, '1F'], [-5.04, 3.66, -0.0, '1F']]", 'none', "1F","50","3","1"],
+                    ['5', '-1/2', 'Simulator_104', '1592209639', '60 sec', '[15938,1592209639]', '[-1,-1.0]', '0', '[0 0 0]', "[[-19.1, 28.48, -3.14, '1F'], [-5.04, 3.66, -0.0, '1F']]", 'none', "2F","40","4","-1"]
+                 ] 
+                }
+        }
+        
+        
+    task error會回傳以下可能字串:
+        "none" => '等待執行'或'執行中'，並未有錯誤發生
+        "script error" => 傳到AGV上的task python腳本發生錯誤，發生的原因: 1. AGV上的python安裝有問題、
+                                                                          2. AI報錯導致腳本出錯
+        "ai error" => 發生的原因: 1.可能有人透過另一個console來操作機器人
+                                  2.AGV被插上Joystick，搶走控制權
+
+        "no error" => '正常結束'，過程中沒有出任何錯誤
+        "busy error" => 機器正在忙，無法執行此任務
+        "already error" => 之前的錯誤尚未解除，不能執行此任務 (除非POST至'http://127.0.0.1:6600/recover_error'以解除錯誤)
+        "lowbattery error" => 電量不足，不能執行此任務
+
+    task的回傳list各欄位索引說明:
+        [0]  mission index    - 任務編號 (str)
+        [1]  task step        - 當前執行步驟/總步驟數 (str)
+        [2]  AGV name         - 被指派的AGV名稱 (str)
+        [3]  start time       - 任務開始時間 UTC timestamp (str)
+        [4]  using time       - 任務使用時間 (str)
+        [5]  booking id&time  - [下命令者userid, 下命令時間] (str)
+        [6]  cancel id&time   - [取消者userid, 取消時間] (str)
+        [7]  AGV type         - AGV類型 (str)
+        [8]  AGV mode         - AGV模式 [上UV燈,下UV燈,吸塵器] (str)
+        [9]  task array       - 任務指令陣列 (str)
+        [10] mission error    - 錯誤訊息 (str)
+        [11] start floor      - 任務起始樓層 (str)
+        [12] work time        - 任務已執行時間(秒) (str)
+        [13] work distance    - 任務已行走距離 (str)
+        [14] group            - 任務群組編號，-1表示不屬於任何群組 (str)
+```
+
+## 5. 相關連結
 * [SetModbusDoubleCheck 原始碼說明](https://github.com/funrobot0804/fms-restful-api/blob/main/SetModbusDoubleCheck.py)
 * [WaitModbusSingleEqual 原始碼說明](https://github.com/funrobot0804/fms-restful-api/blob/main/WaitModbusSingleEqual.py)
+
+
+
+

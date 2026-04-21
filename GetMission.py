@@ -37,8 +37,8 @@ try:
         
         'value':{'unfinish':         # 有'unfinish'和'finish'兩種字串，端看當時POST的'category' 
                  [
-                    ['3',  '2/2', 'Simulator_104', '1592209639', '60 sec', '[15938,1592209639]', '[-1,-1.0]', '0', '[0 0 0]', "[[-19.1, 28.48, -3.14, '1F'], [-5.04, 3.66, -0.0, '1F']]", 'none', "1F","50","3"], 
-                    ['5', '-1/2', 'Simulator_104', '1592209639', '60 sec', '[15938,1592209639]', '[-1,-1.0]', '0', '[0 0 0]', "[[-19.1, 28.48, -3.14, '1F'], [-5.04, 3.66, -0.0, '1F']]", 'none', "2F","40","4"]
+                    ['3',  '2/2', 'Simulator_104', '1592209639', '60 sec', '[15938,1592209639]', '[-1,-1.0]', '0', '[0 0 0]', "[[-19.1, 28.48, -3.14, '1F'], [-5.04, 3.66, -0.0, '1F']]", 'none', "1F","50","3","1"],
+                    ['5', '-1/2', 'Simulator_104', '1592209639', '60 sec', '[15938,1592209639]', '[-1,-1.0]', '0', '[0 0 0]', "[[-19.1, 28.48, -3.14, '1F'], [-5.04, 3.66, -0.0, '1F']]", 'none', "2F","40","4","-1"]
                  ] 
                 }
         }
@@ -51,10 +51,27 @@ try:
         "ai error" => 發生的原因: 1.可能有人透過另一個console來操作機器人
                                   2.AGV被插上Joystick，搶走控制權
 
-        "no error" => '正常結束'，過程中沒有出任何錯誤   
+        "no error" => '正常結束'，過程中沒有出任何錯誤
         "busy error" => 機器正在忙，無法執行此任務
-        "already error" => 之前的錯誤尚未解除，不能執行此任務 (除非POST至'http://127.0.0.1:6600/recover_error'以解除錯誤)   
-        "lowbattery error" => 電量不足，不能執行此任務           
+        "already error" => 之前的錯誤尚未解除，不能執行此任務 (除非POST至'http://127.0.0.1:6600/recover_error'以解除錯誤)
+        "lowbattery error" => 電量不足，不能執行此任務
+
+    task的回傳list各欄位索引說明:
+        [0]  mission index    - 任務編號 (str)
+        [1]  task step        - 當前執行步驟/總步驟數 (str)
+        [2]  AGV name         - 被指派的AGV名稱 (str)
+        [3]  start time       - 任務開始時間 UTC timestamp (str)
+        [4]  using time       - 任務使用時間 (str)
+        [5]  booking id&time  - [下命令者userid, 下命令時間] (str)
+        [6]  cancel id&time   - [取消者userid, 取消時間] (str)
+        [7]  AGV type         - AGV類型 (str)
+        [8]  AGV mode         - AGV模式 [上UV燈,下UV燈,吸塵器] (str)
+        [9]  task array       - 任務指令陣列 (str)
+        [10] mission error    - 錯誤訊息 (str)
+        [11] start floor      - 任務起始樓層 (str)
+        [12] work time        - 任務已執行時間(秒) (str)
+        [13] work distance    - 任務已行走距離 (str)
+        [14] group            - 任務群組編號，-1表示不屬於任何群組 (str)
     '''
     
     result = json_data['result']
@@ -80,8 +97,7 @@ try:
             print("start floor="       , mission[11])# 格式為字串(str)
             print("work time="         , mission[12])# 格式為字串(str)
             print("work distance="     , mission[13])# 格式為字串(str)
-            #print("mission name="     , mission[14])# 格式為字串(str)
-            #print("mission from="     , mission[15])# 格式為字串(str)
+            print("group="             , mission[14])# 格式為字串(str)，任務群組編號，-1表示不屬於任何群組
             print("==========")
 
     print("finish ==> ")
@@ -103,8 +119,7 @@ try:
             print("start floor="       , mission[11])# 格式為字串(str)
             print("work time="         , mission[12])# 格式為字串(str)
             print("work distance="     , mission[13])# 格式為字串(str)
-            #print("mission name="     , mission[14])# 格式為字串(str)
-            #print("mission from="     , mission[15])# 格式為字串(str)
+            print("group="             , mission[14])# 格式為字串(str)，任務群組編號，-1表示不屬於任何群組
             print("==========")
             
 except:                      
